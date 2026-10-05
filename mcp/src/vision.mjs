@@ -44,8 +44,9 @@ export async function renderPdfPages(source, pageNumbers, width = 1800, crop) {
   const loading = getDocument({
     range, rangeChunkSize: 64 * 1024, disableAutoFetch: true, disableStream: true,
     useSystemFonts: true, disableFontFace: false, useWorkerFetch: false,
-    standardFontDataUrl: path.join(pdfRoot, "standard_fonts") + path.sep,
-    cMapUrl: path.join(pdfRoot, "cmaps") + path.sep, cMapPacked: true,
+    // PDF.js requires a forward slash terminator even on Windows.
+    standardFontDataUrl: path.join(pdfRoot, "standard_fonts").split(path.sep).join("/") + "/",
+    cMapUrl: path.join(pdfRoot, "cmaps").split(path.sep).join("/") + "/", cMapPacked: true,
     isEvalSupported: false, maxImageSize: PIXELS, stopAtErrors: true, verbosity: 0,
   });
   range.requestDataRange = (begin, end) => {
