@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "mybox": {
+      "command": "node",
+      "args": ["/absolute/path/MyboxAI/mcp/dist/server.mjs"],
+      "timeout": 180000
+    }
+  }
+}

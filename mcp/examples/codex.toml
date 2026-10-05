@@ -1,0 +1,7 @@
+# /absolute/path 부분을 설치한 폴더의 실제 절대 경로로 바꾸세요.
+# 토큰은 MyboxAI/mcp/.env에서 읽습니다.
+[mcp_servers.mybox]
+command = "node"
+args = ["/absolute/path/MyboxAI/mcp/dist/server.mjs"]
+startup_timeout_sec = 20
+tool_timeout_sec = 180

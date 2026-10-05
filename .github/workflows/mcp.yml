@@ -1,0 +1,24 @@
+name: Portable MCP
+on:
+  push:
+    paths: ["mcp/**", "lib/mybox/**", ".github/workflows/mcp.yml"]
+  pull_request:
+    paths: ["mcp/**", "lib/mybox/**", ".github/workflows/mcp.yml"]
+permissions:
+  contents: read
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mcp/package-lock.json
+      - run: npm ci --prefix mcp --no-audit --no-fund
+      - run: npm test --prefix mcp
