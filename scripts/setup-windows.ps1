@@ -8,7 +8,9 @@ function Test-SupportedNode([string]$Executable) {
     try {
         $reportedVersion = & $Executable --version 2>$null
         if ($LASTEXITCODE -ne 0) { return $false }
-        return ([version]($reportedVersion.Trim().TrimStart('v'))) -ge [version]'22.13.0'
+        $parsedVersion = [version]($reportedVersion.Trim().TrimStart('v'))
+        # Use a runtime with OS trust-store APIs; otherwise use the portable LTS.
+        return (($parsedVersion -ge [version]'22.19.0' -and $parsedVersion.Major -eq 22) -or $parsedVersion -ge [version]'24.5.0')
     } catch { return $false }
 }
 try {
