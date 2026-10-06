@@ -1,3 +1,4 @@
+import "./network.mjs";
 import { AppError } from "../../lib/mybox/errors.ts";
 import { MyboxClient, fileLimit } from "../../lib/mybox/client.ts";
 import { extractPdfRange, extractZipRange, extractHwpRange, extractTextRange } from "../../lib/mybox/range-extract.ts";

@@ -26,7 +26,20 @@ export class MyboxClient {
     for (const [key, value] of Object.entries(query)) if (value !== undefined && value !== "") url.searchParams.set(key, String(value));
     let response: Response;
     try { response = await this.transport(url, { headers: { Authorization: `Bearer ${this.token}`, Accept: "application/json" }, redirect: "error", signal: AbortSignal.timeout(20_000) }); }
-    catch { throw new AppError("MYBOX_UNAVAILABLE", "MYBOX에 접속하지 못했어요. 잠시 후 다시 시도해 주세요.", 502); }
+    catch (error) {
+      // Provider errors may contain credentials. Only classify known codes;
+      // never forward their message, stack, URL or headers to users/logs.
+      const failure = error as { name?: string; cause?: { code?: string } };
+      const code = failure?.cause?.code;
+      if (code && ["SELF_SIGNED_CERT_IN_CHAIN", "DEPTH_ZERO_SELF_SIGNED_CERT", "UNABLE_TO_GET_ISSUER_CERT_LOCALLY", "UNABLE_TO_VERIFY_LEAF_SIGNATURE", "CERT_HAS_EXPIRED", "ERR_TLS_CERT_ALTNAME_INVALID"].includes(code)) {
+        throw new AppError("MYBOX_TLS_ERROR", "MYBOX HTTPS 인증서를 확인하지 못했어요. PC의 신뢰 인증서와 보안 프로그램·프록시 설정을 확인하세요. 구버전 Node.js라면 22.19 이상 또는 24.5 이상의 최신 LTS로 업데이트하세요.", 502);
+      }
+      if (failure?.name === "TimeoutError" || failure?.name === "AbortError" || (code && ["ETIMEDOUT", "UND_ERR_CONNECT_TIMEOUT", "UND_ERR_HEADERS_TIMEOUT"].includes(code))) {
+        throw new AppError("MYBOX_TIMEOUT", "MYBOX 연결 확인 시간이 초과됐어요. 인터넷 연결·VPN·프록시 설정을 확인한 뒤 다시 시도하세요.", 502);
+      }
+      if (code === "ENOTFOUND" || code === "EAI_AGAIN") throw new AppError("MYBOX_DNS_ERROR", "MYBOX 서버 주소를 찾지 못했어요. 인터넷 연결과 DNS 설정을 확인하세요.", 502);
+      throw new AppError("MYBOX_UNAVAILABLE", "MYBOX에 접속하지 못했어요. 인터넷 연결·VPN·프록시 설정을 확인한 뒤 다시 시도해 주세요.", 502);
+    }
     if (!response.ok) {
       await response.body?.cancel();
       const messages: Record<number, string> = { 401: "MYBOX 토큰이 만료되었거나 올바르지 않아요. 다시 연결해 주세요.", 403: "MYBOX 계정 상태나 API 접근 권한을 확인해 주세요.", 404: "파일을 찾을 수 없어요. 이동하거나 삭제되었을 수 있어요.", 429: "MYBOX 호출 한도에 도달했어요. 잠시 후 다시 시도해 주세요." };

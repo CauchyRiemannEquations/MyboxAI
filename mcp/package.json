@@ -11,7 +11,7 @@
     "build": "node scripts/build.mjs",
     "start": "node dist/server.mjs",
     "start:http": "node dist/http.mjs",
-    "test": "npm run build && node --test test/core.test.mjs test/http.test.mjs test/setup.test.mjs",
+    "test": "npm run build && node --test test/core.test.mjs test/http.test.mjs test/setup.test.mjs test/network.test.mjs",
     "setup": "node ../scripts/setup-mybox.mjs",
     "setup:cli": "node ../scripts/setup-mybox.mjs --cli"
   },
