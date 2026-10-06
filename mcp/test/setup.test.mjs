@@ -81,7 +81,11 @@ test("Windows UTF-8 BOM configs remain valid and retain unrelated settings", asy
   assert.equal(parseJson(text.slice(1)).mcpServers.mybox.env.MYBOX_TOKEN_FILE, setup.tokenFile);
 }));
 
-test("noninteractive CLI installs selected clients from a private token file and doctor succeeds", async () => fixture(async ({ setup, directory }) => {
+test("noninteractive CLI installs selected clients from a private token file and doctor succeeds", async t => fixture(async ({ setup, directory }) => {
+  // Node 22's test runner can corrupt its IPC stream when non-ASCII application
+  // stdout is mixed with test events (nodejs/node#65934). Capture CLI output here.
+  const lines = [];
+  t.mock.method(console, "log", (...values) => { lines.push(values.join(" ")); });
   const file = path.join(directory, "private", "pat.txt");
   await put(file, token + "\n");
   await main(["--cli", "--agents", "codex,claude", "--token-file", file, "--yes"], setup);
@@ -89,6 +93,8 @@ test("noninteractive CLI installs selected clients from a private token file and
   assert.equal(await exists(setup.targets[0].file), true);
   assert.equal(await exists(setup.targets[1].file), true);
   await main(["--doctor"], setup);
+  assert(lines.some(line => line.includes("설치 완료")));
+  assert(!lines.join("\n").includes(token));
 }));
 
 test("malformed configs and conflicting TOML forms cause no writes or API requests", async () => fixture(async ({ setup, calls }) => {
