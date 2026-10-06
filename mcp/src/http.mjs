@@ -8,7 +8,7 @@ import { createServer, loadToken } from "./server.mjs";
 import { OwnerOAuthProvider } from "./oauth.mjs";
 import { AppError } from "./core.mjs";
 
-export function createHttpApp({ publicUrl, ownerSecret, token, client, tempRoot } = {}) {
+export function createHttpApp({ publicUrl, ownerSecret, token, client, tempRoot, transferRoot } = {}) {
   const url = new URL(publicUrl);
   const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
   if ((url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) || url.username || url.password || url.search || url.hash || url.pathname !== "/") {
@@ -27,17 +27,18 @@ export function createHttpApp({ publicUrl, ownerSecret, token, client, tempRoot 
     if (req.path === "/mcp" && req.headers.origin && !allowedOrigins.includes(req.headers.origin)) return res.status(403).json({ error: "invalid_origin" });
     next();
   });
-  app.use(mcpAuthRouter({ provider, issuerUrl: url, baseUrl: url, resourceServerUrl: provider.resource, resourceName: "MyboxAI", scopesSupported: ["mybox:read"] }));
+  app.use(mcpAuthRouter({ provider, issuerUrl: url, baseUrl: url, resourceServerUrl: provider.resource, resourceName: "MyboxAI", scopesSupported: ["mybox:read", "mybox:write"] }));
   app.post("/approve", express.urlencoded({ extended: false, limit: "8kb" }), (req, res) => provider.approve(req, res));
   app.get("/", (_req, res) => res.type("text").send("MyboxAI MCP: /mcp. 연결하려면 MCP를 지원하는 앱에 이 서버의 HTTPS /mcp 주소를 등록하세요."));
   app.get("/health", (_req, res) => res.json({ ok: true, service: "MyboxAI" }));
   const auth = requireBearerAuth({ verifier: provider, requiredScopes: ["mybox:read"], expectedResource: provider.resource,
     resourceMetadataUrl: getOAuthProtectedResourceMetadataUrl(provider.resource) });
   let running = 0;
-  app.post("/mcp", auth, express.json({ limit: "1mb" }), async (req, res) => {
+  app.post("/mcp", auth, express.json({ limit: "12mb" }), async (req, res) => {
     if (running >= 4) { res.setHeader("Retry-After", "5"); return res.status(429).json({ error: "busy" }); }
     running++;
-    const server = createServer({ token, client, tempRoot });
+    const writable = req.auth.scopes.includes("mybox:write");
+    const server = createServer({ token, client, tempRoot, readOnly: !writable, localFiles: !!transferRoot && writable, transferRoot, transportName: "streamable-http" });
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     try {
       await server.connect(transport);
@@ -64,7 +65,7 @@ async function main() {
   const token = await loadToken();
   const port = Number(process.env.PORT || 3001), host = process.env.HOST || "127.0.0.1";
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new AppError("INVALID_PORT", "PORT를 확인하세요.");
-  const { app } = createHttpApp({ publicUrl: process.env.MCP_PUBLIC_URL, ownerSecret: process.env.MCP_OWNER_SECRET, token });
+  const { app } = createHttpApp({ publicUrl: process.env.MCP_PUBLIC_URL, ownerSecret: process.env.MCP_OWNER_SECRET, token, transferRoot: process.env.MYBOX_TRANSFER_DIR });
   const listener = app.listen(port, host, () => process.stderr.write("MyboxAI 원격 MCP 서버가 시작되었습니다.\n"));
   const stop = () => { listener.close(() => process.exit(0)); setTimeout(() => process.exit(1), 10000).unref(); };
   process.once("SIGINT", stop); process.once("SIGTERM", stop);

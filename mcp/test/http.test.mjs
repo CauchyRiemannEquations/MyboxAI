@@ -22,13 +22,13 @@ async function register(base) {
   }) });
   assert.equal(response.status, 201); return response.json();
 }
-async function authorize(base, client) {
+async function authorize(base, client, scope = "mybox:read") {
   const url = new URL(base + "/authorize");
-  for (const [key, value] of Object.entries({ client_id: client.client_id, redirect_uri: client.redirect_uris[0], response_type: "code", code_challenge: challenge, code_challenge_method: "S256", scope: "mybox:read", state: "fixture-state", resource: base + "/mcp" })) url.searchParams.set(key, value);
+  for (const [key, value] of Object.entries({ client_id: client.client_id, redirect_uri: client.redirect_uris[0], response_type: "code", code_challenge: challenge, code_challenge_method: "S256", scope, state: "fixture-state", resource: base + "/mcp" })) url.searchParams.set(key, value);
   const response = await fetch(url); assert.equal(response.status, 200);
   const html = await response.text(), cookie = response.headers.get("set-cookie").split(";")[0];
   const ticket = html.match(/name="ticket" value="([^"]+)"/)[1];
-  return { ticket, cookie };
+  return { ticket, cookie, html };
 }
 async function approve(base, pending, value = secret, extras = {}) {
   return fetch(base + "/approve", { method: "POST", redirect: "manual", headers: { "Content-Type": "application/x-www-form-urlencoded", Origin: base, Cookie: pending.cookie, ...extras }, body: new URLSearchParams({ ticket: pending.ticket, secret: value }) });
@@ -90,4 +90,33 @@ test("OAuth PKCE, authenticated MCP images, refresh rotation, and revocation wor
 test("dynamic registration rejects malicious redirect schemes", async () => fixture(async base => {
   const response = await fetch(base + "/register", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ redirect_uris: ["javascript:alert(1)"], token_endpoint_auth_method: "none" }) });
   assert.equal(response.status, 400);
+}));
+
+test("OAuth read grants cannot mutate or escalate through refresh; write grants expose management without server filesystem", async () => fixture(async base => {
+  const client = await register(base);
+  async function grant(scope) {
+    const pending = await authorize(base, client, scope);
+    assert.equal(pending.html.includes("파일 읽기·관리 연결 허용"), scope.includes("write"));
+    const approved = await approve(base, pending);
+    const code = new URL(approved.headers.get("location")).searchParams.get("code");
+    return (await tokenRequest(base, { grant_type: "authorization_code", code, client_id: client.client_id, redirect_uri: client.redirect_uris[0], resource: base + "/mcp", code_verifier: verifier })).json();
+  }
+  const read = await grant("mybox:read"), write = await grant("mybox:read mybox:write");
+  const rpc = async (token, method, params = {}) => {
+    const response = await fetch(base + "/mcp", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Accept: "application/json, text/event-stream" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) });
+    return response.json();
+  };
+  const readTools = (await rpc(read.access_token, "tools/list")).result.tools;
+  assert(!readTools.some(tool => tool.name === "create_folder" || tool.name === "upload_text"));
+  const denied = await rpc(read.access_token, "tools/call", { name: "create_folder", arguments: { name: "must-not-create" } });
+  assert(denied.error || denied.result?.isError);
+  const escalation = await tokenRequest(base, { grant_type: "refresh_token", client_id: client.client_id, refresh_token: read.refresh_token, scope: "mybox:read mybox:write", resource: base + "/mcp" });
+  assert.equal(escalation.status, 400);
+  const writeTools = (await rpc(write.access_token, "tools/list")).result.tools;
+  assert(writeTools.some(tool => tool.name === "create_folder"));
+  assert(!writeTools.some(tool => tool.name === "upload_file" || tool.name === "download_file"));
+  const created = await rpc(write.access_token, "tools/call", { name: "create_folder", arguments: { name: "new folder" } });
+  assert(!created.result.isError);
+  const refreshed = await tokenRequest(base, { grant_type: "refresh_token", client_id: client.client_id, refresh_token: write.refresh_token, resource: base + "/mcp" });
+  assert.equal(refreshed.status, 200); assert((await refreshed.json()).scope.includes("mybox:write"));
 }));

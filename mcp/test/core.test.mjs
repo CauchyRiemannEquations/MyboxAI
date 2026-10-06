@@ -8,7 +8,7 @@ import { zipSync, strToU8 } from "fflate";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { createServer, loadToken } from "../dist/server.mjs";
+import { createServer, loadToken, LOCAL_TOOL_NAMES } from "../dist/server.mjs";
 import { readDocument, stageLocalDocument, fileLimit } from "../dist/core.mjs";
 import { mixedPdf, mockClient } from "./fixtures.mjs";
 
@@ -26,12 +26,14 @@ async function withMcp(client, task) {
   try { await task(sdk); } finally { await sdk.close(); await server.close(); }
 }
 
-test("standard MCP tools expose search, read, and only read-only operations", async () => {
+test("standard MCP exposes file management with accurate read/write annotations", async () => {
   const fixture = mockClient("math.pdf", pdf);
   await withMcp(fixture.client, async sdk => {
     const { tools } = await sdk.listTools();
-    assert.deepEqual(tools.map(tool => tool.name).sort(), ["fetch", "get_connection_status", "get_file_info", "get_storage_info", "list_files", "search"].sort());
-    assert(tools.every(tool => tool.annotations.readOnlyHint && !tool.annotations.destructiveHint));
+    assert.deepEqual(tools.map(tool => tool.name).sort(), [...LOCAL_TOOL_NAMES].sort());
+    assert.equal(tools.find(tool => tool.name === "fetch").annotations.readOnlyHint, true);
+    assert.equal(tools.find(tool => tool.name === "upload_file").annotations.readOnlyHint, false);
+    assert.equal(tools.find(tool => tool.name === "permanently_delete_resource").annotations.destructiveHint, true);
     assert.equal(payload(await sdk.callTool({ name: "search", arguments: { query: "math" } })).files[0].id, "fixture");
     assert.equal(payload(await sdk.callTool({ name: "get_storage_info", arguments: {} })).usedSize, 123);
   });
@@ -141,7 +143,7 @@ test("real stdio subprocess initializes from another working folder and handles 
   const sdk = new Client({ name: "stdio-check", version: "1.0" }, { capabilities: {} });
   await sdk.connect(transport);
   try {
-    assert.equal((await sdk.listTools()).tools.length, 6);
+    assert.equal((await sdk.listTools()).tools.length, LOCAL_TOOL_NAMES.length);
     assert.equal(payload(await sdk.callTool({ name: "get_connection_status", arguments: {} })).configured, false);
     const result = await sdk.callTool({ name: "fetch", arguments: { id: "fixture" } });
     assert(result.isError); assert.equal(payload(result).code, "MYBOX_NOT_CONNECTED");

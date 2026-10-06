@@ -14,10 +14,10 @@ function pageResources(result) {
     file_count: result.fileCount, folder_count: result.subFolderCount };
 }
 export async function searchFiles(client, args) {
-  return pageResources(await client.search(args.query, args.category, args.parent_path, args.cursor, args.count || 20));
+  return pageResources(await client.search(args.query || "", args.category, args.parent_path, args.cursor, args.count || 20, { startDate: args.start_date, endDate: args.end_date, dateField: args.date_field }));
 }
 export async function listFiles(client, args) {
-  return pageResources(await client.list(args.folder_id, args.cursor, args.count || 50));
+  return pageResources(await client.list(args.folder_id, args.cursor, args.count || 50, args.sort));
 }
 
 export async function readDocument(client, input, options = {}) {

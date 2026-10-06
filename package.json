@@ -1,6 +1,6 @@
 {
   "name": "mybox-ai",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -79,5 +79,5 @@
     }
   },
   "packageManager": "pnpm@11.25.0",
-  "description": "Read-only NAVER MYBOX MCP for coding agents and remote AI apps, with native model vision."
+  "description": "NAVER MYBOX file management MCP for coding agents and remote AI apps, with native model vision."
 }

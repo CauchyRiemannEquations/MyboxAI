@@ -11,6 +11,7 @@ import { parse as parseJson } from "jsonc-parser";
 import { createSetup, SetupError } from "../setup/core.mjs";
 import { startSetupServer } from "../setup/web.mjs";
 import { promptSecret, main } from "../setup/main.mjs";
+import { LOCAL_TOOL_NAMES } from "../dist/server.mjs";
 
 const token = "mbx_pat_" + "fixture-token-never-a-real-credential";
 const root = fileURLToPath(new URL("../../", import.meta.url));
@@ -179,7 +180,7 @@ test("actual installed entry launches MCP from a Korean/spaced folder without re
     }
     const setup = createSetup({ root: installRoot, home: path.join(directory, "home"), env: {}, transport: async () => Response.json({ usedSize: 123 }) });
     const result = await setup.install({ token, agents: ["codex"] });
-    assert.equal(result.toolCount, 6);
+    assert.equal(result.toolCount, LOCAL_TOOL_NAMES.length);
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
 

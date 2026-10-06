@@ -40,7 +40,7 @@ export class OwnerOAuthProvider {
     this.failedLogins = this.failedLogins.filter(time => time > now() - 60);
   }
   validateRequest(scopes, resource) {
-    if (scopes?.some(scope => scope !== "mybox:read")) throw new InvalidScopeError("Only mybox:read is supported");
+    if (scopes?.some(scope => !["mybox:read", "mybox:write"].includes(scope))) throw new InvalidScopeError("Use mybox:read and/or mybox:write");
     if (resource && resource.toString().replace(/\/$/, "") !== this.resource.toString()) throw new InvalidRequestError("Wrong resource");
   }
   async authorize(client, params, res) {
@@ -54,10 +54,10 @@ export class OwnerOAuthProvider {
     res.setHeader("Set-Cookie", `mybox_auth=${cookie}; HttpOnly; SameSite=Lax; Path=/; Max-Age=300${this.publicUrl.protocol === "https:" ? "; Secure" : ""}`);
     res.type("html").send(`<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MyboxAI 연결</title>
 <style>body{font:17px system-ui;max-width:520px;margin:60px auto;padding:24px;line-height:1.7}input,button{box-sizing:border-box;width:100%;padding:14px;font:inherit;margin-top:12px}button{background:#087e43;color:white;border:0;border-radius:8px}</style>
-<h1>MyboxAI 읽기 연결</h1><p><strong>${escape(client.client_name || "MCP 클라이언트")}</strong>에 이 서버의 MYBOX 파일 검색·읽기를 허용합니다.</p>
+<h1>MyboxAI 연결</h1><p><strong>${escape(client.client_name || "MCP 클라이언트")}</strong>에 이 서버의 MYBOX ${params.scopes?.includes("mybox:write") ? "파일 검색·읽기·업로드·변경·삭제" : "파일 검색·읽기"}를 허용합니다.</p>
 <p>서버 소유자가 설정한 <code>MCP_OWNER_SECRET</code>을 입력하세요. MYBOX 토큰을 입력하는 칸이 아닙니다.</p>
-<form method="post" action="/approve"><input type="hidden" name="ticket" value="${ticket}"><label>서버 연결 암호<input name="secret" type="password" autocomplete="current-password" required maxlength="1024"></label><button type="submit">파일 검색·읽기 연결 허용</button></form>
-<p>원본 파일 변경·삭제 기능은 없습니다. 승인한 앱이 검색 결과와 문서를 받아 처리합니다.</p></html>`);
+<form method="post" action="/approve"><input type="hidden" name="ticket" value="${ticket}"><label>서버 연결 암호<input name="secret" type="password" autocomplete="current-password" required maxlength="1024"></label><button type="submit">${params.scopes?.includes("mybox:write") ? "파일 읽기·관리 연결 허용" : "파일 검색·읽기 연결 허용"}</button></form>
+<p>${params.scopes?.includes("mybox:write") ? "파일 관리에는 덮어쓰기·삭제·휴지통 비우기가 포함됩니다." : "이 승인은 읽기 전용입니다. 쓰기 기능에는 mybox:write 권한으로 재연결해야 합니다."} 승인한 앱이 파일을 받아 처리합니다.</p></html>`);
   }
   approve(req, res) {
     this.clean();
@@ -71,7 +71,8 @@ export class OwnerOAuthProvider {
     }
     this.pending.delete(req.body.ticket);
     const code = nonce();
-    this.codes.set(code, { clientId: entry.client.client_id, challenge: entry.params.codeChallenge, redirectUri: entry.params.redirectUri, expiresAt: now() + 120 });
+    const scopes = [...new Set(["mybox:read", ...(entry.params.scopes || [])])];
+    this.codes.set(code, { clientId: entry.client.client_id, scopes, challenge: entry.params.codeChallenge, redirectUri: entry.params.redirectUri, expiresAt: now() + 120 });
     const redirect = new URL(entry.params.redirectUri);
     redirect.searchParams.set("code", code);
     if (entry.params.state !== undefined) redirect.searchParams.set("state", entry.params.state);
@@ -84,34 +85,35 @@ export class OwnerOAuthProvider {
     if (!entry || entry.clientId !== client.client_id) throw new InvalidGrantError("Invalid authorization code");
     return entry.challenge;
   }
-  issue(clientId) {
+  issue(clientId, scopes = ["mybox:read"]) {
     this.clean();
     if (this.access.size + this.refresh.size >= 1000) throw new ServerError("Token limit reached");
     const accessToken = nonce(), refreshToken = nonce(), grantId = nonce();
-    this.access.set(accessToken, { clientId, grantId, expiresAt: now() + 3600 });
-    this.refresh.set(refreshToken, { clientId, grantId, expiresAt: now() + 7 * 86400 });
-    return { access_token: accessToken, token_type: "Bearer", expires_in: 3600, refresh_token: refreshToken, scope: "mybox:read" };
+    this.access.set(accessToken, { clientId, scopes, grantId, expiresAt: now() + 3600 });
+    this.refresh.set(refreshToken, { clientId, scopes, grantId, expiresAt: now() + 7 * 86400 });
+    return { access_token: accessToken, token_type: "Bearer", expires_in: 3600, refresh_token: refreshToken, scope: scopes.join(" ") };
   }
   async exchangeAuthorizationCode(client, code, _verifier, redirectUri, resource) {
     this.clean(); this.validateRequest(undefined, resource);
     const entry = this.codes.get(code);
     if (!entry || entry.clientId !== client.client_id || (redirectUri && redirectUri !== entry.redirectUri)) throw new InvalidGrantError("Invalid authorization code");
     this.codes.delete(code);
-    return this.issue(client.client_id);
+    return this.issue(client.client_id, entry.scopes);
   }
   async exchangeRefreshToken(client, token, scopes, resource) {
     this.clean(); this.validateRequest(scopes, resource);
     const entry = this.refresh.get(token);
     if (!entry || entry.clientId !== client.client_id) throw new InvalidGrantError("Invalid refresh token");
+    if (scopes?.some(scope => !entry.scopes.includes(scope))) throw new InvalidScopeError("Refresh cannot expand approved permissions");
     // Rotate both refresh and access tokens in the previous grant.
     this.refresh.delete(token);
     for (const [key, access] of this.access) if (access.grantId === entry.grantId) this.access.delete(key);
-    return this.issue(client.client_id);
+    return this.issue(client.client_id, scopes?.length ? scopes : entry.scopes);
   }
   async verifyAccessToken(token) {
     this.clean(); const entry = this.access.get(token);
     if (!entry) throw new InvalidTokenError("Invalid or expired access token");
-    return { token, clientId: entry.clientId, expiresAt: entry.expiresAt, scopes: ["mybox:read"], resource: this.resource };
+    return { token, clientId: entry.clientId, expiresAt: entry.expiresAt, scopes: entry.scopes, resource: this.resource };
   }
   async revokeToken(client, request) {
     const entry = this.access.get(request.token) || this.refresh.get(request.token);
