@@ -16,7 +16,10 @@
     "verify": "node scripts/verify-mybox.mjs && node scripts/verify-upgrade.mjs",
     "mcp:build": "npm --prefix mcp run build",
     "mcp:start": "node mcp/dist/server.mjs",
-    "mcp:test": "npm --prefix mcp test"
+    "mcp:test": "npm --prefix mcp test",
+    "setup": "node scripts/setup-mybox.mjs",
+    "setup:cli": "node scripts/setup-mybox.mjs --cli",
+    "setup:doctor": "node scripts/setup-mybox.mjs --doctor"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
