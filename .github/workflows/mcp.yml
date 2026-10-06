@@ -1,9 +1,9 @@
 name: Portable MCP
 on:
   push:
-    paths: ["mcp/**", "lib/mybox/**", ".github/workflows/mcp.yml"]
+    paths: ["mcp/**", "lib/mybox/**", "scripts/setup-*", "Setup-MyboxAI.*", "README.md", ".github/workflows/mcp.yml"]
   pull_request:
-    paths: ["mcp/**", "lib/mybox/**", ".github/workflows/mcp.yml"]
+    paths: ["mcp/**", "lib/mybox/**", "scripts/setup-*", "Setup-MyboxAI.*", "README.md", ".github/workflows/mcp.yml"]
 permissions:
   contents: read
 jobs:
@@ -22,3 +22,7 @@ jobs:
           cache-dependency-path: mcp/package-lock.json
       - run: npm ci --prefix mcp --no-audit --no-fund
       - run: npm test --prefix mcp
+      - run: node scripts/setup-mybox.mjs --help
+      - if: runner.os == 'Windows'
+        shell: powershell
+        run: ./scripts/setup-windows.ps1 --help

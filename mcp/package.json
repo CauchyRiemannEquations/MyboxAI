@@ -11,20 +11,24 @@
     "build": "node scripts/build.mjs",
     "start": "node dist/server.mjs",
     "start:http": "node dist/http.mjs",
-    "test": "npm run build && node --test test/core.test.mjs test/http.test.mjs"
+    "test": "npm run build && node --test test/core.test.mjs test/http.test.mjs test/setup.test.mjs",
+    "setup": "node ../scripts/setup-mybox.mjs",
+    "setup:cli": "node ../scripts/setup-mybox.mjs --cli"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",
-    "@napi-rs/canvas": "0.1.100",
+    "@napi-rs/canvas": "1.0.10",
     "cfb": "1.2.2",
     "express": "5.2.1",
     "fflate": "0.8.3",
-    "pdfjs-dist": "5.7.284",
+    "jsonc-parser": "3.3.1",
+    "pdfjs-dist": "6.4.299",
     "sharp": "0.35.5",
+    "smol-toml": "1.9.0",
     "unpdf": "1.8.1",
     "zod": "3.25.76"
   },
   "devDependencies": {
-    "esbuild": "0.28.0"
+    "esbuild": "0.28.2"
   }
 }

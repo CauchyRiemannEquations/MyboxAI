@@ -55,3 +55,7 @@ dist/
 !.env.http.example
 /mcp/core
 /mcp/core.*
+/.mybox-runtime/
+/mcp/.mybox-token
+*.mybox-backup-*
+*.mybox-*.tmp
