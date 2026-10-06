@@ -2,7 +2,7 @@
 
 네이버 MYBOX 파일을 **Codex, Claude Code, Antigravity, Gemini CLI와 MCP를 지원하는 AI 앱**에서 검색하고 읽는 프로젝트입니다.
 
-**스캔 PDF와 사진은 원문 이미지를 현재 에이전트에 전달합니다. GPT를 쓰면 GPT가, Claude를 쓰면 Claude가, Gemini를 쓰면 Gemini가 직접 읽습니다. 별도 OpenAI·Mistral·CLOVA OCR API 키는 필요 없습니다.**
+**스캔 PDF와 사진은 원문 이미지를 현재 에이전트에 전달합니다. GPT를 쓰면 GPT가, Claude를 쓰면 Claude가, Gemini를 쓰면 Gemini가 직접 읽습니다.**
 
 MYBOX는 네이버의 개인 파일 저장 서비스입니다. 네이버 클라우드 플랫폼(NCP)용 관리 도구와는 다릅니다. 네이버·OpenAI·Anthropic·Google의 공식 제품이 아닌 개인 프로젝트입니다.
 
