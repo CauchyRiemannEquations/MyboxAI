@@ -1,9 +1,9 @@
 {
   "name": "mybox-ai-mcp",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
-  "description": "Read-only NAVER MYBOX MCP with native agent vision for scanned PDFs and images.",
+  "description": "NAVER MYBOX file management MCP with native agent vision for scanned PDFs and images.",
   "engines": {
     "node": ">=22.13.0"
   },
@@ -11,7 +11,7 @@
     "build": "node scripts/build.mjs",
     "start": "node dist/server.mjs",
     "start:http": "node dist/http.mjs",
-    "test": "npm run build && node --test test/core.test.mjs test/http.test.mjs test/setup.test.mjs test/network.test.mjs",
+    "test": "npm run build && node --test test/core.test.mjs test/http.test.mjs test/setup.test.mjs test/network.test.mjs test/management.test.mjs test/site.test.mjs",
     "setup": "node ../scripts/setup-mybox.mjs",
     "setup:cli": "node ../scripts/setup-mybox.mjs --cli"
   },

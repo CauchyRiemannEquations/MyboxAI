@@ -7,7 +7,7 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 await mkdir(path.join(root, "dist"), { recursive: true });
 await build({
   absWorkingDir: root,
-  entryPoints: { server: "src/stdio.mjs", core: "src/core.mjs", http: "src/http.mjs" },
+  entryPoints: { server: "src/stdio.mjs", core: "src/core.mjs", http: "src/http.mjs", site_tools: "../lib/mybox/tools.ts", site_mcp: "../lib/mybox/mcp.ts" },
   outdir: "dist",
   bundle: true,
   splitting: true,

@@ -31,7 +31,7 @@ export async function openToken(value: string, userId: string, secret?: string) 
 async function row(env: MyboxEnv, userId: string) { return database(env).prepare("SELECT encrypted_token, connected_at FROM mybox_connections WHERE user_id = ?").bind(userId).first<ConnectionRow>(); }
 export async function connectionStatus(env: MyboxEnv, userId: string) {
   const entry = await row(env, userId);
-  return { connected: !!entry, connected_at: entry?.connected_at ?? null, read_only: true, supported_formats: ["PDF", "HWP", "HWPX", "DOCX", "TXT", "MD", "CSV", "JSON", "PNG", "JPEG", "WEBP"], max_file_bytes: 100 * 1024 * 1024, file_limits_mb: { pdf: 100, documents: 50, images: 20 }, text_window_bytes: 512 * 1024 };
+  return { connected: !!entry, connected_at: entry?.connected_at ?? null, read_only: false, file_management: true, supported_formats: ["PDF", "HWP", "HWPX", "DOCX", "TXT", "MD", "CSV", "JSON", "PNG", "JPEG", "WEBP"], max_file_bytes: 100 * 1024 * 1024, file_limits_mb: { pdf: 100, documents: 50, images: 20 }, text_window_bytes: 512 * 1024 };
 }
 export async function getToken(env: MyboxEnv, userId: string) {
   const entry = await row(env, userId);

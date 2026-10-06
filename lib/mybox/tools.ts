@@ -4,6 +4,7 @@ import { MyboxClient, type Resource } from "./client";
 import { readMyboxFile, type ReadInput } from "./read";
 import { ocrStatus } from "./ocr";
 import { AppError } from "./errors";
+import { isManagementTool, executeManagement, managementToolDefinitions, searchDateSchema } from "./management";
 const str = z.string().min(1).max(1024);
 const category = z.enum(["image", "video", "audio", "document", "archive", "executable", "etc"]);
 const definitions = {
@@ -14,10 +15,16 @@ const definitions = {
   get_file_info: { title: "MYBOX 파일 정보", description: "실제 검색 결과의 id로 파일이나 폴더의 이름·크기·수정일·부모 ID를 확인합니다.", schema: z.object({ id: str }).strict(), properties: { id: { type: "string" } }, required: ["id"] },
   get_storage_info: { title: "MYBOX 용량 확인", description: "현재 사용자의 MYBOX 전체 용량, 사용 용량, 파일 종류별 개수를 확인합니다.", schema: z.object({}).strict(), properties: {} },
 };
-export const toolDefinitions = Object.entries(definitions).map(([name, d]) => ({ name, title: d.title, description: d.description, inputSchema: { type: "object", properties: d.properties, required: "required" in d ? d.required : [], additionalProperties: false }, annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: name !== "fetch", openWorldHint: true } }));
+const extended = {
+  search: definitions.search.schema.extend({ ...searchDateSchema, query: z.string().max(300).default("") }),
+  list_files: definitions.list_files.schema.extend({ count: z.number().int().min(1).max(1000).optional(), sort: z.string().regex(/^(name|createdAt|modifiedAt|accessedAt),(asc|desc)$/).optional() }),
+};
+export const toolDefinitions = [...Object.entries(definitions).map(([name, d]) => ({ name, title: d.title, description: d.description, inputSchema: { type: "object", properties: name === "search" ? { ...d.properties, start_date: { type: "string", format: "date-time" }, end_date: { type: "string", format: "date-time" }, date_field: { type: "string", enum: ["created", "modified"] } } : name === "list_files" ? { ...d.properties, count: { type: "integer", minimum: 1, maximum: 1000 }, sort: { type: "string", pattern: "^(name|createdAt|modifiedAt|accessedAt),(asc|desc)$" } } : d.properties, required: name === "search" ? [] : "required" in d ? d.required : [], additionalProperties: false }, annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: name !== "fetch", openWorldHint: true } })), ...managementToolDefinitions];
 export async function executeTool(name: string, args: unknown, env: MyboxEnv, userId: string, origin: string, clientOverride?: MyboxClient): Promise<Record<string, unknown>> {
+  if (isManagementTool(name)) return executeManagement(name, args, clientOverride || new MyboxClient(await getToken(env, userId)));
   if (!Object.hasOwn(definitions, name)) throw new AppError("UNKNOWN_TOOL", "지원하지 않는 도구예요.", 404);
-  const parsed = definitions[name as keyof typeof definitions].schema.safeParse(args ?? {});
+  const schema = name === "search" ? extended.search : name === "list_files" ? extended.list_files : definitions[name as keyof typeof definitions].schema;
+  const parsed = schema.safeParse(args ?? {});
   if (!parsed.success) throw new AppError("INVALID_ARGUMENTS", "도구 입력값을 확인해 주세요.");
   if (name === "get_connection_status") return { ...await connectionStatus(env, userId), ocr: await ocrStatus(env, userId), setup_url: origin };
   const client = clientOverride || new MyboxClient(await getToken(env, userId));
@@ -27,11 +34,11 @@ export async function executeTool(name: string, args: unknown, env: MyboxEnv, us
   if (name === "get_storage_info") return client.storage();
   if (name === "get_file_info") return { ...await client.info(input.id as string), url: fileUrl(input.id as string) };
   if (name === "search") {
-    const result = await client.search(input.query as string, input.category as string | undefined, input.parent_path as string | undefined, input.cursor as string | undefined, input.count as number | undefined);
+    const result = await client.search((input.query as string) || "", input.category as string | undefined, input.parent_path as string | undefined, input.cursor as string | undefined, input.count as number | undefined, { startDate: input.start_date as string | undefined, endDate: input.end_date as string | undefined, dateField: input.date_field as string | undefined });
     return { results: (result.resources || []).map(item), next_cursor: result.responseMetaData?.nextCursor ?? null, search_scope: "filename_and_category", source: "NAVER MYBOX" };
   }
   if (name === "list_files") {
-    const result = await client.list(input.folder_id as string | undefined, input.cursor as string | undefined, input.count as number | undefined);
+    const result = await client.list(input.folder_id as string | undefined, input.cursor as string | undefined, input.count as number | undefined, input.sort as string | undefined);
     return { results: (result.resources || []).map(item), next_cursor: result.responseMetaData?.nextCursor ?? null, file_count: result.fileCount, folder_count: result.subFolderCount, source: "NAVER MYBOX" };
   }
   return readMyboxFile(client, env, userId, origin, parsed.data as ReadInput);

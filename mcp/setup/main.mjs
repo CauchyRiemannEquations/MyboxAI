@@ -60,7 +60,7 @@ export async function main(args, setup = createSetup()) {
           rl.close(); rl = null;
         }
         const changes = await setup.plan(agents);
-        console.log("선택한 앱의 mybox 항목을 등록/교체합니다. 다른 항목은 유지하며 기존 파일은 백업합니다.");
+        console.log("선택한 앱에 MYBOX 읽기·파일 관리(업로드·변경·삭제 포함)를 연결합니다. mybox 항목을 등록/교체하고 기존 설정은 백업합니다.");
         for (const change of changes) console.log(`${change.name}: ${change.file}`);
         console.log(`토큰 저장 위치: ${setup.tokenFile}`);
         let token;

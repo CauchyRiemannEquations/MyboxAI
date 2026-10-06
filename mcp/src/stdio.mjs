@@ -2,7 +2,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runStdio } from "./server.mjs";
 import { AppError } from "./core.mjs";
-export { createServer, loadToken } from "./server.mjs";
+export { createServer, loadToken, LOCAL_TOOL_NAMES } from "./server.mjs";
 
 // Keep the entrypoint guard here, outside modules shared by the HTTP build.
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) runStdio().catch(error => {

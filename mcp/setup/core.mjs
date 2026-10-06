@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { parse as parseToml } from "smol-toml";
 import { parse as parseJson, modify, applyEdits } from "jsonc-parser";
 import { MyboxClient, AppError } from "../dist/core.mjs";
-import { loadToken } from "../dist/server.mjs";
+import { loadToken, LOCAL_TOOL_NAMES } from "../dist/server.mjs";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
@@ -92,7 +92,9 @@ export async function smokeServer(entry) {
     const { tools } = await client.listTools();
     const status = await client.callTool({ name: "get_connection_status", arguments: {} });
     const block = status.content?.find(item => item.type === "text");
-    if (status.isError || !block || !JSON.parse(block.text).configured || tools.length !== 6) throw new Error();
+    const configured = block && JSON.parse(block.text);
+    const expected = configured?.read_only ? LOCAL_TOOL_NAMES.slice(0, 6) : LOCAL_TOOL_NAMES;
+    if (status.isError || !configured?.configured || expected.some(name => !tools.some(tool => tool.name === name))) throw new Error();
     return tools.length;
   } catch { throw new SetupError("MCP 실행 검증에 실패했습니다. Node.js와 설치 폴더를 확인하세요."); }
   finally { clearTimeout(timer); await client.close().catch(() => {}); await transport.close().catch(() => {}); }
@@ -186,7 +188,7 @@ export function createSetup({ root = fileURLToPath(new URL("../../", import.meta
     await verifyToken(token);
     // Diagnosis uses an existing credential without persisting or registering anything.
     const toolCount = await smoke({ ...entry, env: { MYBOX_TOKEN: token, MYBOX_TOKEN_FILE: "" } });
-    return { ok: true, apiVerified: true, toolCount, message: "MYBOX API 연결과 MCP 도구 6개를 확인했습니다." };
+    return { ok: true, apiVerified: true, toolCount, message: `MYBOX API 연결과 MCP 도구 ${toolCount}개를 확인했습니다.` };
   }
   return { state, plan, install, doctor, targets, tokenFile };
 }
