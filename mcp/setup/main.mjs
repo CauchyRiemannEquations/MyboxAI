@@ -44,6 +44,9 @@ export async function main(args, setup = createSetup()) {
   try {
     if (args.includes("--doctor")) { console.log((await setup.doctor()).message); return; }
     if (args.includes("--cli")) {
+      console.log("토큰 발급: https://mybox.naver.com/main/web/preferences");
+      console.log("계정 및 개인 액세스 토큰 관리 → 개인 액세스 토큰 생성 → 유효기간 30/60/90/180일 선택 → 생성된 토큰 복사");
+      console.log("네이버 화면의 만료일을 확인하세요. 토큰은 생성 시 한 번만 표시되며, 만료 전에 새 토큰으로 다시 연결해야 합니다.");
       let agents = option("--agents")?.split(",").filter(Boolean);
       const yes = args.includes("--yes");
       if (yes && !agents?.length) throw new SetupError("--yes를 사용할 때는 --agents로 연결할 앱을 지정하세요.");
